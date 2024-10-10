@@ -1,25 +1,18 @@
+struct Vertex {
+	@location(0) position: vec3f,
+	@location(1) color: vec3f,
+}
+
 struct VertexFragmentData {
     @builtin(position) position: vec4f,
     @location(0) color: vec3f,
 }
 
 @vertex
-fn vertex_main(@builtin(vertex_index) i: u32) -> VertexFragmentData {
-    var positions = array<vec2f, 3>(
-        vec2f(-0.75, -0.75),
-        vec2f(0.75, -0.75),
-        vec2f(0.0, 0.75),
-    );
-
-    var colors = array<vec3f, 3>(
-        vec3f(1.0, 0.0, 0.0),
-        vec3f(0.0, 1.0, 0.0),
-        vec3f(0.0, 0.0, 1.0),
-    );
-
+fn vertex_main(vertex: Vertex) -> VertexFragmentData {
     var out: VertexFragmentData;
-    out.position = vec4f(positions[i], 0.0, 1.0);
-    out.color = colors[i];
+    out.position = vec4f(vertex.position, 1.0);
+    out.color = vertex.color;
     return out;
 }
 
