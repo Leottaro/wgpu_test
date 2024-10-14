@@ -1,27 +1,40 @@
 use std::env::current_dir;
 use std::fs;
 
-pub struct PipelineBuilder {
+pub struct Builder<'a> {
     shader_filename: String,
     vertex_entry: String,
     fragment_entry: String,
     pixel_format: wgpu::TextureFormat,
     vertex_buffer_layouts: Vec<wgpu::VertexBufferLayout<'static>>,
+    bind_group_layouts: Vec<&'a wgpu::BindGroupLayout>,
+    device: &'a wgpu::Device,
 }
 
-impl PipelineBuilder {
-    pub fn new() -> Self {
-        PipelineBuilder {
+impl<'a> Builder<'a> {
+    pub fn new(device: &'a wgpu::Device) -> Self {
+        Builder {
             shader_filename: "dummy".to_string(),
             vertex_entry: "vertex_main".to_string(),
             fragment_entry: "fragment_main".to_string(),
             pixel_format: wgpu::TextureFormat::Bgra8Unorm,
             vertex_buffer_layouts: Vec::new(),
+            bind_group_layouts: Vec::new(),
+            device,
         }
     }
 
-    pub fn add_buffer_layout(&mut self, buffer_layout: wgpu::VertexBufferLayout<'static>) {
-        self.vertex_buffer_layouts.push(buffer_layout);
+    pub fn reset(&mut self) {
+        self.vertex_buffer_layouts.clear();
+        self.bind_group_layouts.clear();
+    }
+
+    pub fn add_vertex_buffer_layout(&mut self, layout: wgpu::VertexBufferLayout<'static>) {
+        self.vertex_buffer_layouts.push(layout);
+    }
+
+    pub fn add_bind_group_layout(&mut self, layout: &'a wgpu::BindGroupLayout) {
+        self.bind_group_layouts.push(layout);
     }
 
     pub fn set_shader_module(
@@ -39,7 +52,7 @@ impl PipelineBuilder {
         self.pixel_format = pixel_format;
     }
 
-    pub fn build_pipeline(&self, device: &wgpu::Device) -> wgpu::RenderPipeline {
+    pub fn build_pipeline(&mut self, label: &str) -> wgpu::RenderPipeline {
         let mut filepath = current_dir().unwrap();
         filepath.push("src/");
         filepath.push(&self.shader_filename);
@@ -51,14 +64,16 @@ impl PipelineBuilder {
             label: Some(&filepath),
             source: wgpu::ShaderSource::Wgsl(source_code.into()),
         };
-        let shader_module = device.create_shader_module(shader_module_descriptor);
+        let shader_module = self.device.create_shader_module(shader_module_descriptor);
 
         let pipeline_layout_descriptor = wgpu::PipelineLayoutDescriptor {
-            label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[],
+            label: Some(label),
+            bind_group_layouts: &self.bind_group_layouts,
             push_constant_ranges: &[],
         };
-        let pipeline_layout = device.create_pipeline_layout(&pipeline_layout_descriptor);
+        let pipeline_layout = self
+            .device
+            .create_pipeline_layout(&pipeline_layout_descriptor);
 
         let render_targets = [Some(wgpu::ColorTargetState {
             format: self.pixel_format,
@@ -100,6 +115,10 @@ impl PipelineBuilder {
             cache: None,
         };
 
-        device.create_render_pipeline(&render_pipeline_descriptor)
+        let render_pipeline = self
+            .device
+            .create_render_pipeline(&render_pipeline_descriptor);
+        self.reset();
+        render_pipeline
     }
 }
