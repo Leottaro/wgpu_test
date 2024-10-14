@@ -21,6 +21,13 @@ impl<'a> Builder<'a> {
         self.layout = Some(layout);
     }
 
+    pub fn add_buffer(&mut self, buffer: &'a wgpu::Buffer) {
+        self.entries.push(wgpu::BindGroupEntry {
+            binding: self.entries.len() as u32,
+            resource: buffer.as_entire_binding(),
+        });
+    }
+
     pub fn add_material(&mut self, view: &'a wgpu::TextureView, sampler: &'a wgpu::Sampler) {
         self.entries.push(wgpu::BindGroupEntry {
             binding: self.entries.len() as u32,

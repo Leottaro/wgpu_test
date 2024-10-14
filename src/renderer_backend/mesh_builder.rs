@@ -1,15 +1,16 @@
-use glm::*;
+use cgmath::{Vector2, Vector3};
 use wgpu::util::DeviceExt;
 
 pub struct Vertex {
-    position: Vec3,
-    color: Vec3,
+    position: Vector3<f32>,
+    tex_coords: Vector2<f32>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct VertexUniform {
-    data: [[f32; 3]; 2],
+    position: [f32; 3],
+    tex_coords: [f32; 2],
 }
 
 pub struct Mesh {
@@ -20,10 +21,10 @@ pub struct Mesh {
 impl Vertex {
     pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
         const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
 
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as u64,
+            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &ATTRIBUTES,
         }
@@ -31,57 +32,29 @@ impl Vertex {
 
     pub fn to_uniform(&self) -> VertexUniform {
         VertexUniform {
-            data: [*self.position.as_array(), *self.color.as_array()],
+            position: self.position.into(),
+            tex_coords: self.tex_coords.into(),
         }
     }
-}
-
-pub fn make_triangle(device: &wgpu::Device) -> wgpu::Buffer {
-    let vertices: [Vertex; 3] = [
-        Vertex {
-            position: Vec3::new(-0.75, -0.75, 0.0),
-            color: Vec3::new(1.0, 0.0, 0.0),
-        },
-        Vertex {
-            position: Vec3::new(0.75, -0.75, 0.0),
-            color: Vec3::new(0.0, 1.0, 0.0),
-        },
-        Vertex {
-            position: Vec3::new(0.0, 0.75, 0.0),
-            color: Vec3::new(0.0, 0.0, 1.0),
-        },
-    ];
-    let vertices_uniform = vertices
-        .into_iter()
-        .map(|vertex| vertex.to_uniform())
-        .collect::<Vec<VertexUniform>>();
-    let bytes = bytemuck::cast_slice(vertices_uniform.as_slice());
-
-    let buffer_descriptor = wgpu::util::BufferInitDescriptor {
-        label: Some("Triangle Vertex Buffer"),
-        contents: bytes,
-        usage: wgpu::BufferUsages::VERTEX,
-    };
-    device.create_buffer_init(&buffer_descriptor)
 }
 
 pub fn make_quad(device: &wgpu::Device) -> Mesh {
     let vertices: [Vertex; 4] = [
         Vertex {
-            position: Vec3::new(-0.75, -0.75, 0.0),
-            color: Vec3::new(1.0, 0.0, 0.0),
+            position: Vector3::new(-1.0, -1.0, 0.0),
+            tex_coords: Vector2::new(0.0, 0.0),
         },
         Vertex {
-            position: Vec3::new(0.75, -0.75, 0.0),
-            color: Vec3::new(0.0, 1.0, 0.0),
+            position: Vector3::new(1.0, -1.0, 0.0),
+            tex_coords: Vector2::new(1.0, 0.0),
         },
         Vertex {
-            position: Vec3::new(-0.75, 0.75, 0.0),
-            color: Vec3::new(0.0, 1.0, 0.0),
+            position: Vector3::new(-1.0, 1.0, 0.0),
+            tex_coords: Vector2::new(0.0, 1.0),
         },
         Vertex {
-            position: Vec3::new(0.75, 0.75, 0.0),
-            color: Vec3::new(0.0, 0.0, 1.0),
+            position: Vector3::new(1.0, 1.0, 0.0),
+            tex_coords: Vector2::new(0.0, 0.0),
         },
     ];
     let vertices_uniform = vertices

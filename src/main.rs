@@ -1,6 +1,9 @@
 use glfw::{fail_on_errors, Action, Context, Key, Window};
 mod renderer_backend;
-use renderer_backend::{bind_group_layout, material::Material, mesh_builder, pipeline};
+use renderer_backend::{
+    bind_group, bind_group_layout, camera, material::Material, mesh_builder, pipeline,
+};
+use wgpu::util::DeviceExt;
 
 struct State<'a> {
     instance: wgpu::Instance,
@@ -11,10 +14,11 @@ struct State<'a> {
     size: (i32, i32),
     window: &'a mut Window,
     render_pipeline: wgpu::RenderPipeline,
-    triangle_mesh: wgpu::Buffer,
     quad_mesh: mesh_builder::Mesh,
-    triangle_material: Material,
     quad_material: Material,
+    camera: camera::Camera,
+    camera_bind_group_layout: wgpu::BindGroupLayout,
+    camera_controller: camera::CameraController,
 }
 
 impl<'a> State<'a> {
@@ -69,8 +73,21 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
-        let triangle_mesh = mesh_builder::make_triangle(&device);
-        let quad_mesh = mesh_builder::make_quad(&device);
+        let camera = camera::Camera {
+            eye: (0.0, 1.0, 2.0).into(),
+            target: (0.0, 0.0, 0.0).into(),
+            up: cgmath::Vector3::unit_y(),
+            aspect: config.width as f32 / config.height as f32,
+            fovy: 45.0,
+            znear: 0.1,
+            zfar: 100.0,
+        };
+
+        let camera_bind_group_layout = {
+            let mut builder = bind_group_layout::Builder::new(&device);
+            builder.add_buffer(wgpu::ShaderStages::VERTEX);
+            builder.build("Camera Bind Group Layout")
+        };
 
         let material_bind_group_layout = {
             let mut builder = bind_group_layout::Builder::new(&device);
@@ -83,18 +100,21 @@ impl<'a> State<'a> {
             builder.add_vertex_buffer_layout(mesh_builder::Vertex::get_layout());
             builder.set_shader_module("shaders/shader.wgsl", "vertex_main", "fragment_main");
             builder.set_pixel_format(config.format);
+            builder.add_bind_group_layout(&camera_bind_group_layout);
             builder.add_bind_group_layout(&material_bind_group_layout);
             builder.build_pipeline("Render Pipeline")
         };
 
-        let triangle_material =
-            Material::new("img/dirt.png", &device, &queue, &material_bind_group_layout);
+        let quad_mesh = mesh_builder::make_quad(&device);
+
         let quad_material = Material::new(
             "img/stone.png",
             &device,
             &queue,
             &material_bind_group_layout,
         );
+
+        let camera_controller = camera::CameraController::new(0.2);
 
         Self {
             instance,
@@ -105,10 +125,11 @@ impl<'a> State<'a> {
             size,
             window,
             render_pipeline,
-            triangle_mesh,
             quad_mesh,
-            triangle_material,
             quad_material,
+            camera,
+            camera_bind_group_layout,
+            camera_controller,
         }
     }
 
@@ -140,23 +161,43 @@ impl<'a> State<'a> {
             occlusion_query_set: None,
         };
 
+        let mut camera_uniform = camera::CameraUniform::new();
+        camera_uniform.update_view_proj(&self.camera);
+
+        let camera_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Camera Buffer"),
+                contents: bytemuck::cast_slice(&[camera_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+        let camera_bind_group = {
+            let mut builder = bind_group::Builder::new(&self.device);
+            builder.add_buffer(&camera_buffer);
+            builder.set_layout(&self.camera_bind_group_layout);
+            builder.build("Camera Bind Group")
+        };
+
         {
             let mut render_pass = command_encoder.begin_render_pass(&render_pass_descriptor);
             render_pass.set_pipeline(&self.render_pipeline);
 
-            // quad
-            render_pass.set_bind_group(0, &self.quad_material.bind_group, &[]);
+            // camera
+            render_pass.set_bind_group(0, &camera_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(
+                self.quad_mesh.index_buffer.slice(..),
+                wgpu::IndexFormat::Uint16,
+            );
+            // materials
+            render_pass.set_bind_group(1, &self.quad_material.bind_group, &[]);
             render_pass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
             render_pass.set_index_buffer(
                 self.quad_mesh.index_buffer.slice(..),
                 wgpu::IndexFormat::Uint16,
             );
             render_pass.draw_indexed(0..6, 0, 0..1);
-
-            // triangle
-            render_pass.set_bind_group(0, &self.triangle_material.bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.triangle_mesh.slice(..));
-            render_pass.draw(0..3, 0..1);
         }
         self.queue.submit(std::iter::once(command_encoder.finish()));
 
@@ -198,8 +239,15 @@ async fn run() {
     let mut state = State::new(&mut window).await;
 
     while !state.window.should_close() {
+        state.camera_controller.update_camera(&mut state.camera);
+        // println!("Camera: {:?}", state.camera.eye);
+
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
+            if state.camera_controller.process_events(&event) {
+                continue;
+            }
+
             match event {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     println!("Escape pressed: closing window...");

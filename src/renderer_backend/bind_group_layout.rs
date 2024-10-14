@@ -15,6 +15,19 @@ impl<'a> Builder<'a> {
         self.entries.clear();
     }
 
+    pub fn add_buffer(&mut self, shader_stage: wgpu::ShaderStages) {
+        self.entries.push(wgpu::BindGroupLayoutEntry {
+            binding: self.entries.len() as u32,
+            visibility: shader_stage,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        });
+    }
+
     pub fn add_material(&mut self) {
         self.entries.push(wgpu::BindGroupLayoutEntry {
             binding: self.entries.len() as u32,
