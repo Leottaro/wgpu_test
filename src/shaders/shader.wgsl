@@ -13,18 +13,18 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
-	@location(0) texcoord: vec2f,
+	@location(0) tex_coords: vec2f,
 }
 
 @vertex
 fn vertex_main(vertex: VertexInput) -> VertexOutput {
     var out: VertexOutput;
+    out.tex_coords = vertex.tex_coords;
     out.position = camera.view_proj * vec4<f32>(vertex.position, 1.0);
-    out.texcoord = vec2f(vertex.position.x, -vertex.position.y);
     return out;
 }
 
 @fragment
 fn fragment_main(frag_data: VertexOutput) -> @location(0) vec4f {
-    return textureSample(my_texture, my_sampler, frag_data.texcoord);
+    return textureSample(my_texture, my_sampler, frag_data.tex_coords);
 }

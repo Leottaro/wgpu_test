@@ -54,7 +54,7 @@ pub fn make_quad(device: &wgpu::Device) -> Mesh {
         },
         Vertex {
             position: Vector3::new(1.0, 1.0, 0.0),
-            tex_coords: Vector2::new(0.0, 0.0),
+            tex_coords: Vector2::new(1.0, 1.0),
         },
     ];
     let vertices_uniform = vertices
