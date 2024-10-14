@@ -1,10 +1,15 @@
 use glm::*;
 use wgpu::util::DeviceExt;
 
-#[repr(C)]
 pub struct Vertex {
     position: Vec3,
     color: Vec3,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct VertexUniform {
+    data: [[f32; 3]; 2],
 }
 
 pub struct Mesh {
@@ -23,10 +28,12 @@ impl Vertex {
             attributes: &ATTRIBUTES,
         }
     }
-}
 
-unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
+    pub fn to_uniform(&self) -> VertexUniform {
+        VertexUniform {
+            data: [*self.position.as_array(), *self.color.as_array()],
+        }
+    }
 }
 
 pub fn make_triangle(device: &wgpu::Device) -> wgpu::Buffer {
@@ -44,7 +51,11 @@ pub fn make_triangle(device: &wgpu::Device) -> wgpu::Buffer {
             color: Vec3::new(0.0, 0.0, 1.0),
         },
     ];
-    let bytes = unsafe { any_as_u8_slice(&vertices) };
+    let vertices_uniform = vertices
+        .into_iter()
+        .map(|vertex| vertex.to_uniform())
+        .collect::<Vec<VertexUniform>>();
+    let bytes = bytemuck::cast_slice(vertices_uniform.as_slice());
 
     let buffer_descriptor = wgpu::util::BufferInitDescriptor {
         label: Some("Triangle Vertex Buffer"),
@@ -73,7 +84,11 @@ pub fn make_quad(device: &wgpu::Device) -> Mesh {
             color: Vec3::new(0.0, 0.0, 1.0),
         },
     ];
-    let mut bytes = unsafe { any_as_u8_slice(&vertices) };
+    let vertices_uniform = vertices
+        .into_iter()
+        .map(|vertex| vertex.to_uniform())
+        .collect::<Vec<VertexUniform>>();
+    let mut bytes = bytemuck::cast_slice(vertices_uniform.as_slice());
 
     let mut buffer_descriptor = wgpu::util::BufferInitDescriptor {
         label: Some("Quad Vertex Buffer"),
@@ -83,7 +98,7 @@ pub fn make_quad(device: &wgpu::Device) -> Mesh {
     let vertex_buffer = device.create_buffer_init(&buffer_descriptor);
 
     let indices: [u16; 6] = [0, 1, 3, 3, 2, 0];
-    bytes = unsafe { any_as_u8_slice(&indices) };
+    bytes = bytemuck::cast_slice(&indices);
 
     buffer_descriptor = wgpu::util::BufferInitDescriptor {
         label: Some("Quad Index Buffer"),
