@@ -8,7 +8,7 @@ pub struct Vertex {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct VertexUniform {
+pub struct VertexRaw {
     position: [f32; 3],
     tex_coords: [f32; 2],
 }
@@ -19,7 +19,7 @@ pub struct Mesh {
 }
 
 impl Vertex {
-    pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
             wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
 
@@ -30,8 +30,8 @@ impl Vertex {
         }
     }
 
-    pub fn to_uniform(&self) -> VertexUniform {
-        VertexUniform {
+    pub fn raw(&self) -> VertexRaw {
+        VertexRaw {
             position: self.position.into(),
             tex_coords: self.tex_coords.into(),
         }
@@ -41,15 +41,15 @@ impl Vertex {
 pub fn make_quad(device: &wgpu::Device) -> Mesh {
     let vertices: [Vertex; 4] = [
         Vertex {
-            position: Vector3::new(-1.0, -1.0, 0.0),
+            position: Vector3::new(0.0, 0.0, 0.0),
             tex_coords: Vector2::new(0.0, 0.0),
         },
         Vertex {
-            position: Vector3::new(1.0, -1.0, 0.0),
+            position: Vector3::new(1.0, 0.0, 0.0),
             tex_coords: Vector2::new(1.0, 0.0),
         },
         Vertex {
-            position: Vector3::new(-1.0, 1.0, 0.0),
+            position: Vector3::new(0.0, 1.0, 0.0),
             tex_coords: Vector2::new(0.0, 1.0),
         },
         Vertex {
@@ -59,8 +59,8 @@ pub fn make_quad(device: &wgpu::Device) -> Mesh {
     ];
     let vertices_uniform = vertices
         .into_iter()
-        .map(|vertex| vertex.to_uniform())
-        .collect::<Vec<VertexUniform>>();
+        .map(|vertex| vertex.raw())
+        .collect::<Vec<VertexRaw>>();
     let mut bytes = bytemuck::cast_slice(vertices_uniform.as_slice());
 
     let mut buffer_descriptor = wgpu::util::BufferInitDescriptor {

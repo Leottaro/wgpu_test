@@ -1,9 +1,17 @@
 use glfw::{fail_on_errors, Action, Context, Key, Window};
 mod renderer_backend;
+use cgmath::prelude::*;
 use renderer_backend::{
-    bind_group, bind_group_layout, camera, material::Material, mesh_builder, pipeline,
+    bind_group, bind_group_layout, camera, instance, material::Material, mesh_builder, pipeline,
 };
 use wgpu::util::DeviceExt;
+
+const NUM_INSTANCES_PER_ROW: u32 = 10;
+const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+    0.0,
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+);
 
 struct State<'a> {
     instance: wgpu::Instance,
@@ -19,6 +27,7 @@ struct State<'a> {
     camera: camera::Camera,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_controller: camera::CameraController,
+    instances: Vec<instance::Instance>,
 }
 
 impl<'a> State<'a> {
@@ -97,7 +106,8 @@ impl<'a> State<'a> {
 
         let render_pipeline = {
             let mut builder = pipeline::Builder::new(&device);
-            builder.add_vertex_buffer_layout(mesh_builder::Vertex::get_layout());
+            builder.add_vertex_buffer_layout(mesh_builder::Vertex::desc());
+            builder.add_vertex_buffer_layout(instance::InstanceRaw::desc());
             builder.set_shader_module("shaders/shader.wgsl", "vertex_main", "fragment_main");
             builder.set_pixel_format(config.format);
             builder.add_bind_group_layout(&camera_bind_group_layout);
@@ -116,6 +126,31 @@ impl<'a> State<'a> {
 
         let camera_controller = camera::CameraController::new(0.2);
 
+        let instances = (0..NUM_INSTANCES_PER_ROW)
+            .flat_map(|z| {
+                (0..NUM_INSTANCES_PER_ROW).map(move |x| {
+                    let position = cgmath::Vector3 {
+                        x: x as f32,
+                        y: 0.0,
+                        z: z as f32,
+                    } - INSTANCE_DISPLACEMENT;
+
+                    let rotation = if position.is_zero() {
+                        // this is needed so an object at (0, 0, 0) won't get scaled to zero
+                        // as Quaternions can affect scale if they're not created correctly
+                        cgmath::Quaternion::from_axis_angle(
+                            cgmath::Vector3::unit_z(),
+                            cgmath::Deg(0.0),
+                        )
+                    } else {
+                        cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+                    };
+
+                    instance::Instance { position, rotation }
+                })
+            })
+            .collect::<Vec<_>>();
+
         Self {
             instance,
             surface,
@@ -130,6 +165,7 @@ impl<'a> State<'a> {
             camera,
             camera_bind_group_layout,
             camera_controller,
+            instances,
         }
     }
 
@@ -179,25 +215,39 @@ impl<'a> State<'a> {
             builder.build("Camera Bind Group")
         };
 
+        let instance_data = self
+            .instances
+            .iter()
+            .map(instance::Instance::raw)
+            .collect::<Vec<_>>();
+        let instance_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: bytemuck::cast_slice(&instance_data),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
         {
             let mut render_pass = command_encoder.begin_render_pass(&render_pass_descriptor);
             render_pass.set_pipeline(&self.render_pipeline);
 
-            // camera
             render_pass.set_bind_group(0, &camera_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(
-                self.quad_mesh.index_buffer.slice(..),
-                wgpu::IndexFormat::Uint16,
-            );
-            // materials
             render_pass.set_bind_group(1, &self.quad_material.bind_group, &[]);
+
             render_pass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
+
             render_pass.set_index_buffer(
                 self.quad_mesh.index_buffer.slice(..),
                 wgpu::IndexFormat::Uint16,
             );
-            render_pass.draw_indexed(0..6, 0, 0..1);
+
+            render_pass.draw_indexed(
+                0..(self.quad_mesh.index_buffer.size() as u32 / 2),
+                0,
+                0..self.instances.len() as u32,
+            );
         }
         self.queue.submit(std::iter::once(command_encoder.finish()));
 
