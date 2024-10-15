@@ -87,12 +87,6 @@ pub fn make_quad(device: &wgpu::Device) -> Mesh {
 }
 
 pub fn make_cube(device: &wgpu::Device) -> Mesh {
-    // 0 1 2 3 -> 0, 1, 2, 2, 3, 0,
-    // 0 3 7 4 -> 0, 3, 7, 7, 4, 0,
-    // 1 2 6 5 -> 1, 2, 6, 6, 5, 1,
-    // 0 1 5 4 -> 0, 1, 5, 5, 4, 0,
-    // 3 2 6 7 -> 3, 2, 6, 6, 7, 3,
-    // 4 5 6 7 -> 4, 5, 6, 6, 7, 4,
     let vertices: [Vertex; 12] = [
         Vertex {
             // 0
@@ -134,8 +128,7 @@ pub fn make_cube(device: &wgpu::Device) -> Mesh {
             position: Vector3::new(1.0, 0.0, 1.0),
             tex_coords: Vector2::new(0.0, 1.0),
         },
-
-		Vertex {
+        Vertex {
             // 8
             position: Vector3::new(1.0, 1.0, 0.0),
             tex_coords: Vector2::new(1.0, 0.0),
@@ -145,16 +138,15 @@ pub fn make_cube(device: &wgpu::Device) -> Mesh {
             position: Vector3::new(1.0, 1.0, 1.0),
             tex_coords: Vector2::new(1.0, 1.0),
         },
-
-		Vertex {
+        Vertex {
             // 10
             position: Vector3::new(1.0, 0.0, 0.0),
-			tex_coords: Vector2::new(0.0, 0.0),
+            tex_coords: Vector2::new(0.0, 0.0),
         },
         Vertex {
-			// 11
+            // 11
             position: Vector3::new(1.0, 0.0, 1.0),
-			tex_coords: Vector2::new(1.0, 0.0),
+            tex_coords: Vector2::new(1.0, 0.0),
         },
     ];
 

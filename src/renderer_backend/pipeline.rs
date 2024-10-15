@@ -1,6 +1,8 @@
 use std::env::current_dir;
 use std::fs;
 
+use super::texture;
+
 pub struct Builder<'a> {
     shader_filename: String,
     vertex_entry: String,
@@ -99,7 +101,13 @@ impl<'a> Builder<'a> {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
                 entry_point: &self.fragment_entry,

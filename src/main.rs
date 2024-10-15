@@ -2,7 +2,7 @@ use glfw::{fail_on_errors, Action, Context, Key, Window};
 mod renderer_backend;
 use cgmath::prelude::*;
 use renderer_backend::{
-    bind_group, bind_group_layout, camera, instance, mesh_builder, pipeline, texture::Texture,
+    bind_group, bind_group_layout, camera, instance, mesh_builder, pipeline, texture,
 };
 use wgpu::util::DeviceExt;
 
@@ -23,11 +23,12 @@ struct State<'a> {
     window: &'a mut Window,
     render_pipeline: wgpu::RenderPipeline,
     mesh: mesh_builder::Mesh,
-    face_texture: Texture,
+    face_texture: texture::Texture,
     camera: camera::Camera,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_controller: camera::CameraController,
     instances: Vec<instance::Instance>,
+    depth_texture: texture::Texture,
 }
 
 impl<'a> State<'a> {
@@ -104,6 +105,8 @@ impl<'a> State<'a> {
             builder.build("Texture Bind Group Layout")
         };
 
+        let depth_texture = texture::Texture::create_depth_texture(&device, &config);
+
         let render_pipeline = {
             let mut builder = pipeline::Builder::new(&device);
             builder.add_vertex_buffer_layout(mesh_builder::Vertex::desc());
@@ -118,7 +121,7 @@ impl<'a> State<'a> {
         let mesh = mesh_builder::make_cube(&device);
 
         let face_texture =
-            Texture::new("img/stone.png", &device, &queue, &texture_bind_group_layout);
+            texture::Texture::new("img/stone.png", &device, &queue, &texture_bind_group_layout);
 
         let camera_controller = camera::CameraController::new(0.2);
 
@@ -162,6 +165,7 @@ impl<'a> State<'a> {
             camera_bind_group_layout,
             camera_controller,
             instances,
+            depth_texture,
         }
     }
 
@@ -188,7 +192,14 @@ impl<'a> State<'a> {
         let render_pass_descriptor = wgpu::RenderPassDescriptor {
             label: Some("Renderpass"),
             color_attachments: &[Some(color_attachment)],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
             timestamp_writes: None,
             occlusion_query_set: None,
         };
@@ -229,7 +240,7 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.render_pipeline);
 
             render_pass.set_bind_group(0, &camera_bind_group, &[]);
-            render_pass.set_bind_group(1, &self.face_texture.bind_group, &[]);
+            render_pass.set_bind_group(1, self.face_texture.bind_group.as_ref().unwrap(), &[]);
 
             render_pass.set_vertex_buffer(0, self.mesh.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
@@ -257,6 +268,7 @@ impl<'a> State<'a> {
         self.size = size;
         self.config.width = size.0 as u32;
         self.config.height = size.1 as u32;
+        self.depth_texture = texture::Texture::create_depth_texture(&self.device, &self.config);
         self.surface.configure(&self.device, &self.config);
     }
 
