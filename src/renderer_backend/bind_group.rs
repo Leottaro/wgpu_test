@@ -28,7 +28,7 @@ impl<'a> Builder<'a> {
         });
     }
 
-    pub fn add_material(&mut self, view: &'a wgpu::TextureView, sampler: &'a wgpu::Sampler) {
+    pub fn add_texture(&mut self, view: &'a wgpu::TextureView, sampler: &'a wgpu::Sampler) {
         self.entries.push(wgpu::BindGroupEntry {
             binding: self.entries.len() as u32,
             resource: wgpu::BindingResource::TextureView(view),

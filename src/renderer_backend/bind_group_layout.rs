@@ -28,7 +28,7 @@ impl<'a> Builder<'a> {
         });
     }
 
-    pub fn add_material(&mut self) {
+    pub fn add_texture(&mut self) {
         self.entries.push(wgpu::BindGroupLayoutEntry {
             binding: self.entries.len() as u32,
             visibility: wgpu::ShaderStages::FRAGMENT,

@@ -1,34 +1,42 @@
 use super::bind_group;
 
-pub struct Material {
+pub struct Texture {
+    pub texture: wgpu::Texture,
+    pub view: wgpu::TextureView,
+    pub sampler: wgpu::Sampler,
     pub bind_group: wgpu::BindGroup,
 }
 
-impl Material {
+impl Texture {
+    pub fn get_rgba(filename: &str) -> image::ImageBuffer<image::Rgba<u8>, Vec<u8>> {
+        let mut filepath = std::env::current_dir().unwrap();
+        filepath.push(filename);
+        let filepath = filepath.into_os_string().into_string().unwrap();
+
+        let bytes = std::fs::read(&filepath).expect(&format!("cannot load texture: {}", filepath));
+        let dynamic = image::load_from_memory(&bytes).unwrap();
+        let rgba = dynamic.to_rgba8();
+        rgba
+    }
+
     pub fn new(
         filename: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let mut filepath = std::env::current_dir().unwrap();
-        filepath.push(filename);
-        let filepath = filepath.into_os_string().into_string().unwrap();
+        let diffuse_rgba = Texture::get_rgba("img/stone.png");
+        let dimensions = diffuse_rgba.dimensions();
 
-        let bytes = std::fs::read(&filepath).expect(&format!("cannot load texture: {}", filepath));
-        let loaded_image = image::load_from_memory(&bytes).unwrap();
-        let converted_data = loaded_image.to_rgba8();
-        let size = converted_data.dimensions();
-
-        let texture_size = wgpu::Extent3d {
-            width: size.0,
-            height: size.1,
+        let size = wgpu::Extent3d {
+            width: dimensions.0,
+            height: dimensions.1,
             depth_or_array_layers: 1,
         };
 
         let texture_descriptor = wgpu::TextureDescriptor {
             label: Some(&filename),
-            size: texture_size,
+            size,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -45,13 +53,13 @@ impl Material {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            &converted_data,
+            &diffuse_rgba,
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(size.0 * 4),
-                rows_per_image: Some(size.1),
+                bytes_per_row: Some(dimensions.0 * 4),
+                rows_per_image: Some(dimensions.1),
             },
-            texture_size,
+            size,
         );
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -67,11 +75,18 @@ impl Material {
         };
         let sampler = device.create_sampler(&sampler_descriptor);
 
-        let mut builder = bind_group::Builder::new(device);
-        builder.add_material(&view, &sampler);
-        builder.set_layout(layout);
-        let bind_group = builder.build(filename);
+        let bind_group = {
+            let mut builder = bind_group::Builder::new(device);
+            builder.set_layout(layout);
+            builder.add_texture(&view, &sampler);
+            builder.build(filename)
+        };
 
-        Self { bind_group }
+        Self {
+            texture,
+            view,
+            sampler,
+            bind_group,
+        }
     }
 }

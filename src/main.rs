@@ -2,7 +2,7 @@ use glfw::{fail_on_errors, Action, Context, Key, Window};
 mod renderer_backend;
 use cgmath::prelude::*;
 use renderer_backend::{
-    bind_group, bind_group_layout, camera, instance, material::Material, mesh_builder, pipeline,
+    bind_group, bind_group_layout, camera, instance, mesh_builder, pipeline, texture::Texture,
 };
 use wgpu::util::DeviceExt;
 
@@ -23,7 +23,7 @@ struct State<'a> {
     window: &'a mut Window,
     render_pipeline: wgpu::RenderPipeline,
     mesh: mesh_builder::Mesh,
-    quad_material: Material,
+    face_texture: Texture,
     camera: camera::Camera,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_controller: camera::CameraController,
@@ -98,10 +98,10 @@ impl<'a> State<'a> {
             builder.build("Camera Bind Group Layout")
         };
 
-        let material_bind_group_layout = {
+        let texture_bind_group_layout = {
             let mut builder = bind_group_layout::Builder::new(&device);
-            builder.add_material();
-            builder.build("Material Bind Group Layout")
+            builder.add_texture();
+            builder.build("Texture Bind Group Layout")
         };
 
         let render_pipeline = {
@@ -111,18 +111,14 @@ impl<'a> State<'a> {
             builder.set_shader_module("shaders/shader.wgsl", "vertex_main", "fragment_main");
             builder.set_pixel_format(config.format);
             builder.add_bind_group_layout(&camera_bind_group_layout);
-            builder.add_bind_group_layout(&material_bind_group_layout);
+            builder.add_bind_group_layout(&texture_bind_group_layout);
             builder.build_pipeline("Render Pipeline")
         };
 
         let mesh = mesh_builder::make_cube(&device);
 
-        let quad_material = Material::new(
-            "img/stone.png",
-            &device,
-            &queue,
-            &material_bind_group_layout,
-        );
+        let face_texture =
+            Texture::new("img/stone.png", &device, &queue, &texture_bind_group_layout);
 
         let camera_controller = camera::CameraController::new(0.2);
 
@@ -161,7 +157,7 @@ impl<'a> State<'a> {
             window,
             render_pipeline,
             mesh,
-            quad_material,
+            face_texture,
             camera,
             camera_bind_group_layout,
             camera_controller,
@@ -233,7 +229,7 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.render_pipeline);
 
             render_pass.set_bind_group(0, &camera_bind_group, &[]);
-            render_pass.set_bind_group(1, &self.quad_material.bind_group, &[]);
+            render_pass.set_bind_group(1, &self.face_texture.bind_group, &[]);
 
             render_pass.set_vertex_buffer(0, self.mesh.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
