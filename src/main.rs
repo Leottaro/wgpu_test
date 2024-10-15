@@ -8,9 +8,9 @@ use wgpu::util::DeviceExt;
 
 const NUM_INSTANCES_PER_ROW: u32 = 10;
 const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
-    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+    NUM_INSTANCES_PER_ROW as f32,
     0.0,
-    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+    NUM_INSTANCES_PER_ROW as f32,
 );
 
 struct State<'a> {
@@ -22,7 +22,7 @@ struct State<'a> {
     size: (i32, i32),
     window: &'a mut Window,
     render_pipeline: wgpu::RenderPipeline,
-    quad_mesh: mesh_builder::Mesh,
+    mesh: mesh_builder::Mesh,
     quad_material: Material,
     camera: camera::Camera,
     camera_bind_group_layout: wgpu::BindGroupLayout,
@@ -83,7 +83,7 @@ impl<'a> State<'a> {
         surface.configure(&device, &config);
 
         let camera = camera::Camera {
-            eye: (0.0, 1.0, 2.0).into(),
+            eye: (-2.0, 1.0, 0.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3::unit_y(),
             aspect: config.width as f32 / config.height as f32,
@@ -115,7 +115,7 @@ impl<'a> State<'a> {
             builder.build_pipeline("Render Pipeline")
         };
 
-        let quad_mesh = mesh_builder::make_quad(&device);
+        let mesh = mesh_builder::make_cube(&device);
 
         let quad_material = Material::new(
             "img/stone.png",
@@ -160,7 +160,7 @@ impl<'a> State<'a> {
             size,
             window,
             render_pipeline,
-            quad_mesh,
+            mesh,
             quad_material,
             camera,
             camera_bind_group_layout,
@@ -235,16 +235,14 @@ impl<'a> State<'a> {
             render_pass.set_bind_group(0, &camera_bind_group, &[]);
             render_pass.set_bind_group(1, &self.quad_material.bind_group, &[]);
 
-            render_pass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
+            render_pass.set_vertex_buffer(0, self.mesh.vertex_buffer.slice(..));
             render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
 
-            render_pass.set_index_buffer(
-                self.quad_mesh.index_buffer.slice(..),
-                wgpu::IndexFormat::Uint16,
-            );
+            render_pass
+                .set_index_buffer(self.mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
             render_pass.draw_indexed(
-                0..(self.quad_mesh.index_buffer.size() as u32 / 2),
+                0..(self.mesh.index_buffer.size() as u32 / 2),
                 0,
                 0..self.instances.len() as u32,
             );
