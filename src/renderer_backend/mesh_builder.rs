@@ -19,6 +19,13 @@ pub struct Mesh {
 }
 
 impl Vertex {
+    pub fn new(data: [f32; 5]) -> Self {
+        Vertex {
+            position: Vector3::new(data[0], data[1], data[2]),
+            tex_coords: Vector2::new(data[3], data[4]),
+        }
+    }
+
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
             wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
@@ -38,116 +45,20 @@ impl Vertex {
     }
 }
 
-pub fn make_quad(device: &wgpu::Device) -> Mesh {
-    let vertices: [Vertex; 4] = [
-        Vertex {
-            position: Vector3::new(0.0, 0.0, 0.0),
-            tex_coords: Vector2::new(0.0, 0.0),
-        },
-        Vertex {
-            position: Vector3::new(1.0, 0.0, 0.0),
-            tex_coords: Vector2::new(1.0, 0.0),
-        },
-        Vertex {
-            position: Vector3::new(1.0, 1.0, 0.0),
-            tex_coords: Vector2::new(1.0, 1.0),
-        },
-        Vertex {
-            position: Vector3::new(0.0, 1.0, 0.0),
-            tex_coords: Vector2::new(0.0, 1.0),
-        },
-    ];
-    let vertices_uniform = vertices
-        .into_iter()
-        .map(|vertex| vertex.raw())
-        .collect::<Vec<VertexRaw>>();
-    let mut bytes = bytemuck::cast_slice(vertices_uniform.as_slice());
-
-    let mut buffer_descriptor = wgpu::util::BufferInitDescriptor {
-        label: Some("Quad Vertex Buffer"),
-        contents: bytes,
-        usage: wgpu::BufferUsages::VERTEX,
-    };
-    let vertex_buffer = device.create_buffer_init(&buffer_descriptor);
-
-    let indices: [u16; 6] = [0, 1, 2, 2, 3, 0];
-    bytes = bytemuck::cast_slice(&indices);
-
-    buffer_descriptor = wgpu::util::BufferInitDescriptor {
-        label: Some("Quad Index Buffer"),
-        contents: bytes,
-        usage: wgpu::BufferUsages::INDEX,
-    };
-    let index_buffer = device.create_buffer_init(&buffer_descriptor);
-
-    Mesh {
-        vertex_buffer,
-        index_buffer,
-    }
-}
-
 pub fn make_cube(device: &wgpu::Device) -> Mesh {
     let vertices: [Vertex; 12] = [
-        Vertex {
-            // 0
-            position: Vector3::new(0.0, 0.0, 0.0),
-            tex_coords: Vector2::new(0.0, 1.0),
-        },
-        Vertex {
-            // 1
-            position: Vector3::new(0.0, 1.0, 0.0),
-            tex_coords: Vector2::new(0.0, 0.0),
-        },
-        Vertex {
-            // 2
-            position: Vector3::new(0.0, 1.0, 1.0),
-            tex_coords: Vector2::new(1.0, 0.0),
-        },
-        Vertex {
-            // 3
-            position: Vector3::new(0.0, 0.0, 1.0),
-            tex_coords: Vector2::new(1.0, 1.0),
-        },
-        Vertex {
-            // 4
-            position: Vector3::new(1.0, 0.0, 0.0),
-            tex_coords: Vector2::new(1.0, 1.0),
-        },
-        Vertex {
-            // 5
-            position: Vector3::new(1.0, 1.0, 0.0),
-            tex_coords: Vector2::new(1.0, 0.0),
-        },
-        Vertex {
-            // 6
-            position: Vector3::new(1.0, 1.0, 1.0),
-            tex_coords: Vector2::new(0.0, 0.0),
-        },
-        Vertex {
-            // 7
-            position: Vector3::new(1.0, 0.0, 1.0),
-            tex_coords: Vector2::new(0.0, 1.0),
-        },
-        Vertex {
-            // 8
-            position: Vector3::new(1.0, 1.0, 0.0),
-            tex_coords: Vector2::new(1.0, 0.0),
-        },
-        Vertex {
-            // 9
-            position: Vector3::new(1.0, 1.0, 1.0),
-            tex_coords: Vector2::new(1.0, 1.0),
-        },
-        Vertex {
-            // 10
-            position: Vector3::new(1.0, 0.0, 0.0),
-            tex_coords: Vector2::new(0.0, 0.0),
-        },
-        Vertex {
-            // 11
-            position: Vector3::new(1.0, 0.0, 1.0),
-            tex_coords: Vector2::new(1.0, 0.0),
-        },
+        Vertex::new([0.0, 0.0, 0.0, 0.0, 1.0]),
+        Vertex::new([0.0, 1.0, 0.0, 0.0, 0.0]),
+        Vertex::new([0.0, 1.0, 1.0, 1.0, 0.0]),
+        Vertex::new([0.0, 0.0, 1.0, 1.0, 1.0]),
+        Vertex::new([1.0, 0.0, 0.0, 1.0, 1.0]),
+        Vertex::new([1.0, 1.0, 0.0, 1.0, 0.0]),
+        Vertex::new([1.0, 1.0, 1.0, 0.0, 0.0]),
+        Vertex::new([1.0, 0.0, 1.0, 0.0, 1.0]),
+        Vertex::new([1.0, 1.0, 0.0, 1.0, 0.0]),
+        Vertex::new([1.0, 1.0, 1.0, 1.0, 1.0]),
+        Vertex::new([1.0, 0.0, 0.0, 0.0, 0.0]),
+        Vertex::new([1.0, 0.0, 1.0, 1.0, 0.0]),
     ];
 
     let vertices_uniform = vertices

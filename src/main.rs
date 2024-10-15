@@ -1,3 +1,5 @@
+use std::ops::Div;
+
 use glfw::{fail_on_errors, Action, Context, Key, Window};
 mod renderer_backend;
 use cgmath::prelude::*;
@@ -6,11 +8,11 @@ use renderer_backend::{
 };
 use wgpu::util::DeviceExt;
 
-const NUM_INSTANCES_PER_ROW: u32 = 10;
+const NUM_INSTANCES_PER_ROW: u32 = 20;
 const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
-    NUM_INSTANCES_PER_ROW as f32,
+    NUM_INSTANCES_PER_ROW as f32 / 2.0,
     0.0,
-    NUM_INSTANCES_PER_ROW as f32,
+    NUM_INSTANCES_PER_ROW as f32 / 2.0,
 );
 
 struct State<'a> {
@@ -128,11 +130,14 @@ impl<'a> State<'a> {
         let instances = (0..NUM_INSTANCES_PER_ROW)
             .flat_map(|z| {
                 (0..NUM_INSTANCES_PER_ROW).map(move |x| {
-                    let position = cgmath::Vector3 {
+                    let mut position = cgmath::Vector3 {
                         x: x as f32,
                         y: 0.0,
                         z: z as f32,
-                    } - INSTANCE_DISPLACEMENT;
+                    };
+                    position -= INSTANCE_DISPLACEMENT;
+                    position *= 2.0;
+                    position += cgmath::Vector3::new(-0.5, -0.5, -0.5);
 
                     let rotation = if position.is_zero() {
                         // this is needed so an object at (0, 0, 0) won't get scaled to zero
@@ -145,7 +150,15 @@ impl<'a> State<'a> {
                         cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
                     };
 
-                    instance::Instance { position, rotation }
+                    let scale = f32::cos(position.x as f32 * 0.75).powi(2).div(2.0)
+                        * f32::cos(position.z as f32 * 0.75).powi(2).div(2.0)
+                        + 1.0;
+
+                    instance::Instance {
+                        position,
+                        rotation,
+                        scale,
+                    }
                 })
             })
             .collect::<Vec<_>>();
