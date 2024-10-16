@@ -7,9 +7,13 @@ pub struct Texture {
     pub bind_group: Option<wgpu::BindGroup>,
 }
 
+const TEXTURES_DIR: &str = "textures/";
+
 impl Texture {
     pub fn get_rgba(filename: &str) -> image::ImageBuffer<image::Rgba<u8>, Vec<u8>> {
         let mut filepath = std::env::current_dir().unwrap();
+        filepath.push(crate::RESSOURCES_DIR);
+        filepath.push(TEXTURES_DIR);
         filepath.push(filename);
         let filepath = filepath.into_os_string().into_string().unwrap();
 
@@ -25,7 +29,7 @@ impl Texture {
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let diffuse_rgba = Texture::get_rgba("img/stone.png");
+        let diffuse_rgba = Texture::get_rgba(filename);
         let dimensions = diffuse_rgba.dimensions();
 
         let size = wgpu::Extent3d {
