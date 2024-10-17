@@ -1,3 +1,4 @@
+use cgmath::EuclideanSpace;
 use glfw::WindowEvent;
 
 #[rustfmt::skip]
@@ -9,8 +10,7 @@ const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 );
 
 pub struct Camera {
-    pub eye: cgmath::Point3<f32>,
-    pub target: cgmath::Point3<f32>,
+    pub spherical_coords: cgmath::Point3<f32>,
     pub up: cgmath::Vector3<f32>,
     pub aspect: f32,
     pub fovy: f32,
@@ -19,8 +19,23 @@ pub struct Camera {
 }
 
 impl Camera {
+    pub fn to_cartesian_coords(&self) -> cgmath::Point3<f32> {
+        let r = self.spherical_coords.x;
+        let theta = self.spherical_coords.y;
+        let phi = self.spherical_coords.z;
+        cgmath::Point3 {
+            x: r * f32::sin(theta) * f32::cos(phi),
+            y: r * f32::cos(theta),
+            z: r * f32::sin(theta) * f32::sin(phi),
+        }
+    }
+
     pub fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
+        let view = cgmath::Matrix4::look_at_rh(
+            self.to_cartesian_coords(),
+            cgmath::Point3::origin(),
+            self.up,
+        );
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
 
         return OPENGL_TO_WGPU_MATRIX * proj * view;
@@ -48,24 +63,28 @@ impl CameraUniform {
 
 pub struct CameraController {
     speed: f32,
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
+    zoom: f32,
+    is_up_pressed: bool,
+    is_down_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
 }
+const THRESHOLD: f32 = 0.1;
 
 impl CameraController {
     pub fn new(speed: f32) -> Self {
         Self {
             speed,
-            is_forward_pressed: false,
-            is_backward_pressed: false,
+            zoom: 0.0,
+            is_up_pressed: false,
+            is_down_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
         }
     }
 
     pub fn process_events(&mut self, event: &WindowEvent) -> bool {
+        self.zoom = 0.0;
         match event {
             WindowEvent::Key(key, _, action, _) => {
                 if action == &glfw::Action::Repeat {
@@ -73,12 +92,20 @@ impl CameraController {
                 }
                 let is_pressed = *action == glfw::Action::Press;
                 match key {
-                    glfw::Key::Up | glfw::Key::W => self.is_forward_pressed = is_pressed,
-                    glfw::Key::Down | glfw::Key::S => self.is_backward_pressed = is_pressed,
+                    glfw::Key::Up | glfw::Key::W => self.is_up_pressed = is_pressed,
+                    glfw::Key::Down | glfw::Key::S => self.is_down_pressed = is_pressed,
                     glfw::Key::Left | glfw::Key::A => self.is_left_pressed = is_pressed,
                     glfw::Key::Right | glfw::Key::D => self.is_right_pressed = is_pressed,
                     _ => return false,
                 };
+                true
+            }
+            WindowEvent::Scroll(_, y) => {
+                if f64::abs(*y) > THRESHOLD as f64 {
+                    self.zoom = *y as f32;
+                } else {
+                    self.zoom = 0.0;
+                }
                 true
             }
             _ => false,
@@ -86,36 +113,35 @@ impl CameraController {
     }
 
     pub fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
-
-        // Prevents glitching when the camera gets too close to the
-        // center of the scene.
-        if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
-        }
-        if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
+        use std::f32::consts::{PI, TAU};
+        let (mut r, mut theta, mut phi) = camera.spherical_coords.into();
+        let zoom_speed = self.zoom * self.speed;
+        if r + zoom_speed > THRESHOLD {
+            r += zoom_speed;
+        } else {
+            r = THRESHOLD;
         }
 
-        let right = forward_norm.cross(camera.up);
-
-        // Redo radius calc in case the forward/backward is pressed.
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
-
-        if self.is_right_pressed {
-            // Rescale the distance between the target and the eye so
-            // that it doesn't change. The eye, therefore, still
-            // lies on the circle made by the target and eye.
-            camera.eye = camera.target
-                - (forward + right * self.speed * forward_mag).normalize() * forward_mag;
+        let right_speed = (self.is_right_pressed as i8 - self.is_left_pressed as i8) as f32
+            * (self.speed * TAU * 0.01);
+        if right_speed != 0.0 {
+            phi -= right_speed;
+            while phi < 0.0 || phi > TAU {
+                if phi > TAU {
+                    phi -= TAU;
+                } else if phi < 0.0 {
+                    phi += TAU;
+                }
+            }
         }
-        if self.is_left_pressed {
-            camera.eye = camera.target
-                - (forward - right * self.speed * forward_mag).normalize() * forward_mag;
+
+        let up_speed = (self.is_up_pressed as i8 - self.is_down_pressed as i8) as f32
+            * (self.speed * PI * 0.01);
+        if up_speed != 0.0 {
+            let temp = theta - up_speed;
+            theta = f32::min(f32::max(temp, THRESHOLD), PI - THRESHOLD);
         }
+
+        camera.spherical_coords = cgmath::Point3::new(r, theta, phi);
     }
 }

@@ -78,8 +78,7 @@ impl<'a> State<'a> {
         surface.configure(&device, &config);
 
         let camera = camera::Camera {
-            eye: (-2.0, 1.0, 0.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
+            spherical_coords: cgmath::Point3::new(5.0, 1.0, 1.0),
             up: cgmath::Vector3::unit_y(),
             aspect: config.width as f32 / config.height as f32,
             fovy: 45.0,
@@ -117,7 +116,7 @@ impl<'a> State<'a> {
         let face_texture =
             texture::Texture::new("stone.png", &device, &queue, &texture_bind_group_layout);
 
-        let camera_controller = camera::CameraController::new(0.2);
+        let camera_controller = camera::CameraController::new(0.75);
 
         // let instances = vec![instance::Instance::default_instance()];
         let instances = instance::Instance::test_instances();
@@ -305,6 +304,5 @@ async fn run() {
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed={}/*/*", RESSOURCES_DIR);
     pollster::block_on(run());
 }
