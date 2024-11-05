@@ -138,8 +138,7 @@ impl CameraController {
         let up_speed = (self.is_up_pressed as i8 - self.is_down_pressed as i8) as f32
             * (self.speed * PI * 0.01);
         if up_speed != 0.0 {
-            let temp = theta - up_speed;
-            theta = f32::min(f32::max(temp, THRESHOLD), PI - THRESHOLD);
+            theta = f32::min(f32::max(theta - up_speed, THRESHOLD), PI - THRESHOLD);
         }
 
         camera.spherical_coords = cgmath::Point3::new(r, theta, phi);

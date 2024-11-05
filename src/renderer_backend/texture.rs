@@ -10,7 +10,7 @@ pub struct Texture {
 const TEXTURES_DIR: &str = "textures/";
 
 impl Texture {
-    pub fn get_rgba(filename: &str) -> image::ImageBuffer<image::Rgba<u8>, Vec<u8>> {
+    pub fn load_image(filename: &str) -> image::DynamicImage {
         let mut filepath = std::env::current_dir().unwrap();
         filepath.push(crate::RESSOURCES_DIR);
         filepath.push(TEXTURES_DIR);
@@ -18,18 +18,17 @@ impl Texture {
         let filepath = filepath.into_os_string().into_string().unwrap();
 
         let bytes = std::fs::read(&filepath).expect(&format!("cannot load texture: {}", filepath));
-        let dynamic = image::load_from_memory(&bytes).unwrap();
-        let rgba = dynamic.to_rgba8();
-        rgba
+        image::load_from_memory(&bytes).unwrap()
     }
 
-    pub fn new(
-        filename: &str,
+    pub fn from_image(
+        image: &image::DynamicImage,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        layout: &wgpu::BindGroupLayout,
+        layout: Option<&wgpu::BindGroupLayout>,
+        label: Option<&str>,
     ) -> Self {
-        let diffuse_rgba = Texture::get_rgba(filename);
+        let diffuse_rgba = image.to_rgba8();
         let dimensions = diffuse_rgba.dimensions();
 
         let size = wgpu::Extent3d {
@@ -39,7 +38,7 @@ impl Texture {
         };
 
         let texture_descriptor = wgpu::TextureDescriptor {
-            label: Some(&filename),
+            label,
             size,
             mip_level_count: 1,
             sample_count: 1,
@@ -69,7 +68,7 @@ impl Texture {
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let sampler_descriptor = wgpu::SamplerDescriptor {
-            label: Some(filename),
+            label,
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::Repeat,
             address_mode_w: wgpu::AddressMode::Repeat,
@@ -79,18 +78,20 @@ impl Texture {
         };
         let sampler = device.create_sampler(&sampler_descriptor);
 
-        let bind_group = {
+        let bind_group = if layout.is_some() {
             let mut builder = bind_group::Builder::new(device);
-            builder.set_layout(layout);
+            builder.set_layout(layout.unwrap());
             builder.add_texture(&view, &sampler);
-            builder.build(filename)
-        };
+            Some(builder.build(label.unwrap_or("default texute bind group")))
+        } else {
+			None
+		};
 
         Self {
             texture,
             view,
             sampler,
-            bind_group: Some(bind_group),
+            bind_group,
         }
     }
 
@@ -138,5 +139,11 @@ impl Texture {
             sampler,
             bind_group: None,
         }
+    }
+
+    pub fn default_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+        let mut builder = super::bind_group_layout::Builder::new(device);
+        builder.add_texture();
+        builder.build("Texture Bind Group Layout")
     }
 }

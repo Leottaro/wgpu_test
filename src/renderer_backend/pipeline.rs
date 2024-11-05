@@ -8,6 +8,7 @@ pub struct Builder<'a> {
     vertex_entry: String,
     fragment_entry: String,
     pixel_format: wgpu::TextureFormat,
+    front_face: wgpu::FrontFace,
     vertex_buffer_layouts: Vec<wgpu::VertexBufferLayout<'static>>,
     bind_group_layouts: Vec<&'a wgpu::BindGroupLayout>,
     device: &'a wgpu::Device,
@@ -20,6 +21,7 @@ impl<'a> Builder<'a> {
             vertex_entry: "vertex_main".to_string(),
             fragment_entry: "fragment_main".to_string(),
             pixel_format: wgpu::TextureFormat::Bgra8Unorm,
+            front_face: wgpu::FrontFace::Cw,
             vertex_buffer_layouts: Vec::new(),
             bind_group_layouts: Vec::new(),
             device,
@@ -52,6 +54,10 @@ impl<'a> Builder<'a> {
 
     pub fn set_pixel_format(&mut self, pixel_format: wgpu::TextureFormat) {
         self.pixel_format = pixel_format;
+    }
+
+    pub fn set_front_face(&mut self, front_face: wgpu::FrontFace) {
+        self.front_face = front_face;
     }
 
     pub fn build_pipeline(&mut self, label: &str) -> wgpu::RenderPipeline {
@@ -95,7 +101,7 @@ impl<'a> Builder<'a> {
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
+                front_face: self.front_face,
                 cull_mode: Some(wgpu::Face::Back),
                 polygon_mode: wgpu::PolygonMode::Fill,
                 unclipped_depth: false,

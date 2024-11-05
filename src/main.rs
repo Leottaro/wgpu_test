@@ -1,7 +1,12 @@
+use std::f32::consts::PI;
+
+use cgmath::Rotation3;
 use glfw::{fail_on_errors, Action, Context, Key, Window};
 mod renderer_backend;
 use renderer_backend::{
-    bind_group, bind_group_layout, camera, instance, mesh_builder, pipeline, texture,
+    bind_group, bind_group_layout, camera, instance,
+    model::{self, Vertex},
+    pipeline, texture,
 };
 use wgpu::util::DeviceExt;
 
@@ -16,7 +21,7 @@ struct State<'a> {
     size: (i32, i32),
     window: &'a mut Window,
     render_pipeline: wgpu::RenderPipeline,
-    mesh: mesh_builder::Mesh,
+    obj_model: model::Model,
     face_texture: texture::Texture,
     camera: camera::Camera,
     camera_bind_group_layout: wgpu::BindGroupLayout,
@@ -78,7 +83,7 @@ impl<'a> State<'a> {
         surface.configure(&device, &config);
 
         let camera = camera::Camera {
-            spherical_coords: cgmath::Point3::new(5.0, 1.0, 1.0),
+            spherical_coords: cgmath::Point3::new(5.0, PI / 2.0, -PI / 2.0),
             up: cgmath::Vector3::unit_y(),
             aspect: config.width as f32 / config.height as f32,
             fovy: 45.0,
@@ -92,29 +97,32 @@ impl<'a> State<'a> {
             builder.build("Camera Bind Group Layout")
         };
 
-        let texture_bind_group_layout = {
-            let mut builder = bind_group_layout::Builder::new(&device);
-            builder.add_texture();
-            builder.build("Texture Bind Group Layout")
-        };
+        let texture_bind_group_layout = texture::Texture::default_layout(&device);
 
         let depth_texture = texture::Texture::create_depth_texture(&device, &config);
 
         let render_pipeline = {
             let mut builder = pipeline::Builder::new(&device);
-            builder.add_vertex_buffer_layout(mesh_builder::Vertex::desc());
+            builder.add_vertex_buffer_layout(model::ModelVertex::desc());
             builder.add_vertex_buffer_layout(instance::InstanceRaw::desc());
             builder.set_shader_module("shaders/shader.wgsl", "vertex_main", "fragment_main");
             builder.set_pixel_format(config.format);
+            builder.set_front_face(wgpu::FrontFace::Cw);
             builder.add_bind_group_layout(&camera_bind_group_layout);
             builder.add_bind_group_layout(&texture_bind_group_layout);
             builder.build_pipeline("Render Pipeline")
         };
 
-        let mesh = mesh_builder::make_cube(&device);
+        let stone_image = texture::Texture::load_image("test.png");
+        let face_texture = texture::Texture::from_image(
+            &stone_image,
+            &device,
+            &queue,
+            Some(&texture_bind_group_layout),
+            Some("stone"),
+        );
 
-        let face_texture =
-            texture::Texture::new("stone.png", &device, &queue, &texture_bind_group_layout);
+        let simple_block = model::Model::load_model("full_block.obj", &device, &queue);
 
         let camera_controller = camera::CameraController::new(0.75);
 
@@ -130,7 +138,7 @@ impl<'a> State<'a> {
             size,
             window,
             render_pipeline,
-            mesh,
+            obj_model: simple_block,
             face_texture,
             camera,
             camera_bind_group_layout,
@@ -213,16 +221,11 @@ impl<'a> State<'a> {
             render_pass.set_bind_group(0, &camera_bind_group, &[]);
             render_pass.set_bind_group(1, self.face_texture.bind_group.as_ref().unwrap(), &[]);
 
-            render_pass.set_vertex_buffer(0, self.mesh.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
-
-            render_pass
-                .set_index_buffer(self.mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-
-            render_pass.draw_indexed(
-                0..(self.mesh.index_buffer.size() as u32 / 2),
-                0,
+            model::DrawModel::draw_mesh_instanced(
+                &mut render_pass,
+                &self.obj_model.meshes[0],
                 0..self.instances.len() as u32,
+                &instance_buffer,
             );
         }
         self.queue.submit(std::iter::once(command_encoder.finish()));
@@ -304,5 +307,6 @@ async fn run() {
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=res/*/*/*");
     pollster::block_on(run());
 }

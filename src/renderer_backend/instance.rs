@@ -15,7 +15,7 @@ pub struct InstanceRaw {
     pub scale: f32,
 }
 
-const NUM_INSTANCES_PER_ROW: u32 = 20;
+const NUM_INSTANCES_PER_ROW: u32 = 200;
 const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
     NUM_INSTANCES_PER_ROW as f32 / 2.0,
     0.0,
@@ -35,7 +35,7 @@ impl Instance {
 
     pub fn default_instance() -> Self {
         Self {
-            position: cgmath::Vector3::new(-0.5, -0.5, -0.5),
+            position: cgmath::Vector3::new(0.0, 0.0, 0.0),
             rotation: cgmath::Quaternion::from_axis_angle(
                 cgmath::Vector3::unit_z(),
                 cgmath::Deg(0.0),
@@ -55,7 +55,6 @@ impl Instance {
                     };
                     position -= INSTANCE_DISPLACEMENT;
                     position *= 2.0;
-                    position += cgmath::Vector3::new(-0.5, -0.5, -0.5);
 
                     let rotation = if position.is_zero() {
                         cgmath::Quaternion::from_axis_angle(
@@ -78,6 +77,16 @@ impl Instance {
                 })
             })
             .collect::<Vec<_>>()
+    }
+
+    pub fn default_buffer(device: &wgpu::Device) -> wgpu::Buffer {
+        let instance_data = vec![Instance::default_instance().raw()];
+        let buffer_desc = wgpu::util::BufferInitDescriptor {
+            label: Some("Default Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        };
+        wgpu::util::DeviceExt::create_buffer_init(device, &buffer_desc)
     }
 }
 

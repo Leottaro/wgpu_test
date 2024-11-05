@@ -36,7 +36,7 @@ fn vertex_main(vertex: VertexInput,
     );
     let instance_view_proj = camera.view_proj * instance_transform;
 
-    let scaled_position = (vertex.position - instance.position) * instance.scale + instance.position * instance.scale;
+    let scaled_position = vertex.position * instance.scale;
     let projected_position = instance_view_proj * vec4<f32>(scaled_position, 1.0);
 
     var out: VertexOutput;
