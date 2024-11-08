@@ -1,6 +1,5 @@
-use std::f32::consts::PI;
+use std::time::{Duration, SystemTime};
 
-use cgmath::Rotation3;
 use glfw::{fail_on_errors, Action, Context, Key, Window};
 mod renderer_backend;
 use renderer_backend::{
@@ -24,6 +23,7 @@ struct State<'a> {
     obj_model: model::Model,
     face_texture: texture::Texture,
     camera: camera::Camera,
+    camera_projection: camera::Projection,
     camera_bind_group_layout: wgpu::BindGroupLayout,
     camera_controller: camera::CameraController,
     instances: Vec<instance::Instance>,
@@ -82,14 +82,11 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
-        let camera = camera::Camera {
-            spherical_coords: cgmath::Point3::new(5.0, PI / 2.0, -PI / 2.0),
-            up: cgmath::Vector3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
+        let camera = camera::Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
+        let camera_projection =
+            camera::Projection::new(config.width, config.height, cgmath::Deg(90.0), 0.1, 100.0);
+        let camera_controller =
+            camera::CameraController::new(std::f32::consts::PI, 0.1, window.get_cursor_pos());
 
         let camera_bind_group_layout = {
             let mut builder = bind_group_layout::Builder::new(&device);
@@ -124,8 +121,6 @@ impl<'a> State<'a> {
 
         let simple_block = model::Model::load_model("full_block.obj", &device, &queue);
 
-        let camera_controller = camera::CameraController::new(0.75);
-
         // let instances = vec![instance::Instance::default_instance()];
         let instances = instance::Instance::test_instances();
 
@@ -141,6 +136,7 @@ impl<'a> State<'a> {
             obj_model: simple_block,
             face_texture,
             camera,
+            camera_projection,
             camera_bind_group_layout,
             camera_controller,
             instances: instances,
@@ -184,7 +180,7 @@ impl<'a> State<'a> {
         };
 
         let mut camera_uniform = camera::CameraUniform::new();
-        camera_uniform.update_view_proj(&self.camera);
+        camera_uniform.update_view_proj(&self.camera, &self.camera_projection);
 
         let camera_buffer = self
             .device
@@ -244,6 +240,7 @@ impl<'a> State<'a> {
         self.config.height = size.1 as u32;
         self.depth_texture = texture::Texture::create_depth_texture(&self.device, &self.config);
         self.surface.configure(&self.device, &self.config);
+        self.camera_projection.resize(size.0 as u32, size.1 as u32);
     }
 
     fn update_surface(&mut self, size: Option<(i32, i32)>) {
@@ -262,15 +259,23 @@ async fn run() {
     let (mut window, events) = glfw
         .create_window(1280, 720, "GPU time !", glfw::WindowMode::Windowed)
         .unwrap();
-
+    window.set_cursor_mode(glfw::CursorMode::Disabled);
     window.set_all_polling(true);
     window.make_current();
 
     let mut state = State::new(&mut window).await;
+    let mut current_frame: SystemTime = SystemTime::now();
+    let mut last_frame: SystemTime;
+    let mut delta_time: Duration;
 
     while !state.window.should_close() {
-        state.camera_controller.update_camera(&mut state.camera);
-        // println!("Camera: {:?}", state.camera.eye);
+        last_frame = current_frame;
+        current_frame = SystemTime::now();
+        delta_time = current_frame.duration_since(last_frame).unwrap();
+
+        state
+            .camera_controller
+            .update_camera(&mut state.camera, delta_time);
 
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {

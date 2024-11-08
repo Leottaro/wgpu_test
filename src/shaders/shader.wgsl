@@ -7,10 +7,12 @@ struct InstanceInput {
 	@location(10) scale: f32,
 };
 
-struct CameraUniform {
+struct Camera {
+    view_pos: vec4<f32>,
     view_proj: mat4x4<f32>,
-};
-@group(0) @binding(0) var<uniform> camera: CameraUniform;
+}
+@group(0) @binding(0)
+var<uniform> camera: Camera;
 
 @group(1) @binding(0) var my_texture: texture_2d<f32>;
 @group(1) @binding(1) var my_sampler: sampler;

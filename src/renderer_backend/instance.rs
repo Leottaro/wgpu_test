@@ -1,6 +1,4 @@
 use cgmath::prelude::*;
-use std::ops::*;
-
 pub struct Instance {
     pub position: cgmath::Vector3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
@@ -54,20 +52,14 @@ impl Instance {
                         z: z as f32,
                     };
                     position -= INSTANCE_DISPLACEMENT;
-                    position *= 2.0;
+                    // position *= 2.0;
 
-                    let rotation = if position.is_zero() {
-                        cgmath::Quaternion::from_axis_angle(
-                            cgmath::Vector3::unit_z(),
-                            cgmath::Deg(0.0),
-                        )
-                    } else {
-                        cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
-                    };
+                    let rotation = cgmath::Quaternion::from_axis_angle(
+                        cgmath::Vector3::unit_z(),
+                        cgmath::Deg(0.0),
+                    );
 
-                    let scale = f32::cos(position.x as f32 * 0.75).powi(2).div(2.0)
-                        * f32::cos(position.z as f32 * 0.75).powi(2).div(2.0)
-                        + 1.0;
+                    let scale = 1.0;
 
                     Self {
                         position,
