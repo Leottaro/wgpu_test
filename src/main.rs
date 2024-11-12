@@ -1,6 +1,7 @@
 use std::time::{Duration, SystemTime};
 
 use glfw::{fail_on_errors, Action, Context, Key, Window};
+use rayon::prelude::*;
 mod renderer_backend;
 use renderer_backend::{
     bind_group, bind_group_layout, camera, instance,
@@ -84,7 +85,7 @@ impl<'a> State<'a> {
 
         let camera = camera::Camera::new((-5.0, 5.0, -5.0), cgmath::Deg(45.0), cgmath::Deg(0.0));
         let camera_projection =
-            camera::Projection::new(config.width, config.height, cgmath::Deg(90.0), 0.1, 100.0);
+            camera::Projection::new(config.width, config.height, cgmath::Deg(90.0), 0.1, 1000.0);
         let camera_controller =
             camera::CameraController::new(std::f32::consts::PI, 0.1, window.get_cursor_pos());
 
@@ -122,7 +123,7 @@ impl<'a> State<'a> {
         let simple_block = model::Model::load_model("full_block.obj", &device, &queue);
 
         // let instances = vec![instance::Instance::default_instance()];
-        let instances = instance::Instance::test_instances(50, 3, false, 1.0);
+        let instances = instance::Instance::test_instances(75, 3, false, 1.0);
 
         Self {
             instance,
@@ -200,7 +201,7 @@ impl<'a> State<'a> {
         let frustum = camera::Frustum::new(&self.camera, &self.camera_projection);
         let instance_data = self
             .instances
-            .iter()
+            .par_iter()
             .filter(|instance| frustum.is_inside_instance(instance))
             .map(instance::Instance::raw)
             .collect::<Vec<_>>();
