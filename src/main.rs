@@ -82,7 +82,7 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
-        let camera = camera::Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
+        let camera = camera::Camera::new((-5.0, 5.0, -5.0), cgmath::Deg(45.0), cgmath::Deg(0.0));
         let camera_projection =
             camera::Projection::new(config.width, config.height, cgmath::Deg(90.0), 0.1, 100.0);
         let camera_controller =
@@ -122,7 +122,7 @@ impl<'a> State<'a> {
         let simple_block = model::Model::load_model("full_block.obj", &device, &queue);
 
         // let instances = vec![instance::Instance::default_instance()];
-        let instances = instance::Instance::test_instances();
+        let instances = instance::Instance::test_instances(50, 3, false, 1.0);
 
         Self {
             instance,
@@ -197,11 +197,14 @@ impl<'a> State<'a> {
             builder.build("Camera Bind Group")
         };
 
+        let frustum = camera::Frustum::new(&self.camera, &self.camera_projection);
         let instance_data = self
             .instances
             .iter()
+            .filter(|instance| frustum.is_inside_instance(instance))
             .map(instance::Instance::raw)
             .collect::<Vec<_>>();
+        println!("Instance data: {:?}", instance_data.len());
         let instance_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -220,7 +223,7 @@ impl<'a> State<'a> {
             model::DrawModel::draw_mesh_instanced(
                 &mut render_pass,
                 &self.obj_model.meshes[0],
-                0..self.instances.len() as u32,
+                0..instance_data.len() as u32,
                 &instance_buffer,
             );
         }
@@ -257,7 +260,7 @@ impl<'a> State<'a> {
 async fn run() {
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     let (mut window, events) = glfw
-        .create_window(1280, 720, "GPU time !", glfw::WindowMode::Windowed)
+        .create_window(900, 900, "GPU time !", glfw::WindowMode::Windowed)
         .unwrap();
     window.set_cursor_mode(glfw::CursorMode::Disabled);
     window.set_all_polling(true);

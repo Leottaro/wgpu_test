@@ -1,4 +1,5 @@
 use cgmath::prelude::*;
+
 pub struct Instance {
     pub position: cgmath::Vector3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
@@ -12,13 +13,6 @@ pub struct InstanceRaw {
     pub position: [f32; 3],
     pub scale: f32,
 }
-
-const NUM_INSTANCES_PER_ROW: u32 = 200;
-const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
-    NUM_INSTANCES_PER_ROW as f32 / 2.0,
-    0.0,
-    NUM_INSTANCES_PER_ROW as f32 / 2.0,
-);
 
 impl Instance {
     pub fn raw(&self) -> InstanceRaw {
@@ -42,30 +36,40 @@ impl Instance {
         }
     }
 
-    pub fn test_instances() -> Vec<Self> {
-        (0..NUM_INSTANCES_PER_ROW)
-            .flat_map(|z| {
-                (0..NUM_INSTANCES_PER_ROW).map(move |x| {
-                    let mut position = cgmath::Vector3 {
-                        x: x as f32,
-                        y: 0.0,
-                        z: z as f32,
-                    };
-                    position -= INSTANCE_DISPLACEMENT;
-                    // position *= 2.0;
+    pub fn test_instances(size: u32, dimension: u32, centered: bool, spaced: f32) -> Vec<Self> {
+        let x_range = (if dimension >= 1 { 0..size } else { 0..1 }).into_iter();
+        let z_range = (if dimension >= 2 { 0..size } else { 0..1 }).into_iter();
+        let y_range = (if dimension >= 3 { 0..size } else { 0..1 }).into_iter();
+        let centered_vec = cgmath::Vector3::new(size as f32, size as f32, size as f32) / 2.0;
+        x_range
+            .flat_map(|x| {
+                let z_range = z_range.clone();
+                let y_range = y_range.clone();
+                z_range.flat_map(move |z| {
+                    y_range.clone().map(move |y| {
+                        let mut position = cgmath::Vector3 {
+                            x: x as f32,
+                            y: y as f32,
+                            z: z as f32,
+                        };
+                        if centered {
+                            position -= centered_vec;
+                        }
+                        position *= spaced;
 
-                    let rotation = cgmath::Quaternion::from_axis_angle(
-                        cgmath::Vector3::unit_z(),
-                        cgmath::Deg(0.0),
-                    );
+                        let rotation = cgmath::Quaternion::from_axis_angle(
+                            cgmath::Vector3::unit_z(),
+                            cgmath::Deg(0.0),
+                        );
 
-                    let scale = 1.0;
+                        let scale = 1.0;
 
-                    Self {
-                        position,
-                        rotation,
-                        scale,
-                    }
+                        Self {
+                            position,
+                            rotation,
+                            scale,
+                        }
+                    })
                 })
             })
             .collect::<Vec<_>>()
